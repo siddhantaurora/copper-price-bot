@@ -7,10 +7,11 @@ import requests
 
 def main():
     try:
-        bot_token, chat_id = os.environ.get("BOT_TOKEN"), os.environ.get("CHAT_ID")
-        if not bot_token or not chat_id:
+        bot_token, chat_ids_env = os.environ.get("BOT_TOKEN"), os.environ.get("CHAT_ID")
+        if not bot_token or not chat_ids_env:
             print("Missing BOT_TOKEN or CHAT_ID environment variables.")
             return
+        chat_ids = [cid.strip() for cid in chat_ids_env.split(',')]
 
         # STEP A - Fetch Data
         try:
@@ -20,9 +21,10 @@ def main():
             comex_data = usdinr_data = pd.DataFrame()
 
         if comex_data.empty or usdinr_data.empty:
-            requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", data={
-                "chat_id": chat_id, "text": "⚠️ Data fetch failed. Will retry tomorrow.", "parse_mode": "Markdown"
-            })
+            for cid in chat_ids:
+                requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", data={
+                    "chat_id": cid, "text": "⚠️ Data fetch failed. Will retry tomorrow.", "parse_mode": "Markdown"
+                })
             sys.exit(0)
 
         comex_close = comex_data['Close'].squeeze()
@@ -122,13 +124,15 @@ _{action}_
 
 _Note: Based on COMEX copper (99.7% correlated with MCX). Actual MCX price may differ by 1-3%. Indicators are statistical guides, not guarantees._"""
 
-        requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}).raise_for_status()
+        for cid in chat_ids:
+            requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", data={"chat_id": cid, "text": msg, "parse_mode": "Markdown"}).raise_for_status()
         
     except Exception as e:
-        bot_token, chat_id = os.environ.get("BOT_TOKEN"), os.environ.get("CHAT_ID")
-        if bot_token and chat_id:
-            try: requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", data={"chat_id": chat_id, "text": f"⚠️ Copper Bot Error: {e}. Will retry tomorrow.", "parse_mode": "Markdown"})
-            except: pass
+        bot_token, chat_ids_env = os.environ.get("BOT_TOKEN"), os.environ.get("CHAT_ID")
+        if bot_token and chat_ids_env:
+            for cid in [c.strip() for c in chat_ids_env.split(',')]:
+                try: requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", data={"chat_id": cid, "text": f"⚠️ Copper Bot Error: {e}. Will retry tomorrow.", "parse_mode": "Markdown"})
+                except: pass
         sys.exit(0)
 
 if __name__ == "__main__":
